@@ -1,0 +1,29 @@
+# Data (too large / downloaded separately)
+data/raw/*
+data/synthetic/
+!data/raw/.gitkeep
+*.zip
+
+# Generated outputs (reference results live in results/)
+reports/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+junit.xml
+htmlcov/
+.ipynb_checkpoints/
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,129 @@
+# Continuous integration: every push and pull request is linted, tested on several
+# Python versions and operating systems, smoke-tested end to end and built.
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:  # cancel superseded runs of the same branch
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  MPLBACKEND: Agg
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check --output-format=github .
+      - run: ruff format --check .
+
+  test:
+    name: Test (py${{ matrix.python-version }}, ${{ matrix.os }})
+    needs: lint
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install package with dev extras
+        run: pip install -e ".[dev]"
+      - name: Run tests with coverage gate
+        run: >
+          pytest --cov=oulad_risk --cov-report=xml --cov-report=term
+          --cov-fail-under=90 --junitxml=junit.xml
+      - name: Upload coverage and test report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            junit.xml
+
+  smoke:
+    name: End-to-end smoke run + quality gate
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[xgboost]"
+      - name: Generate synthetic OULAD-shaped data
+        run: oulad-risk synth --out-dir data/synthetic --students 1500
+      - name: Leakage audit
+        run: oulad-risk audit --data-dir data/synthetic | tee audit.txt
+      - name: Train and evaluate (fails if ROC-AUC < 0.70)
+        run: |
+          oulad-risk run --data-dir data/synthetic --out-dir reports/rf  --model rf  --min-auc 0.70
+          oulad-risk run --data-dir data/synthetic --out-dir reports/xgb --model xgb --min-auc 0.70
+      - name: Write job summary
+        run: |
+          python - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json
+          print("## Smoke-run metrics (synthetic data, tuned threshold)\n")
+          print("| Model | ROC-AUC | F1 | Precision | Recall | Shared students |")
+          print("|---|---|---|---|---|---|")
+          for m in ("rf", "xgb"):
+              r = json.load(open(f"reports/{m}/metrics.json"))
+              t = r["metrics"]["test_tuned_threshold"]
+              s = r["leakage_audit"]["group_split"]["n_shared_students"]
+              print(f"| {m} | {t['roc_auc']} | {t['f1']} | {t['precision']} | {t['recall']} | {s} |")
+          PY
+          echo '```' >> "$GITHUB_STEP_SUMMARY"; cat audit.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-reports
+          path: reports/
+
+  build:
+    name: Build distribution
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: Install the built wheel and check the CLI
+        run: |
+          pip install dist/*.whl
+          oulad-risk --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

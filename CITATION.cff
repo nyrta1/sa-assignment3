@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "oulad-early-risk: Leakage-resistant early academic risk prediction on OULAD"
+authors:
+  - family-names: Turlubekov
+    given-names: Nurtay
+    affiliation: Astana IT University
+version: 0.1.0
+date-released: 2026-10-09
+license: MIT
+repository-code: "https://github.com/USERNAME/oulad-early-risk"
+keywords: [learning analytics, OULAD, early warning, data leakage, machine learning]
+references:
+  - type: article
+    title: "Open University Learning Analytics dataset"
+    authors:
+      - family-names: Kuzilek
+        given-names: Jakub
+      - family-names: Hlosta
+        given-names: Martin
+      - family-names: Zdrahal
+        given-names: Zdenek
+    journal: "Scientific Data"
+    volume: 4
+    start: 170171
+    year: 2017
+    doi: "10.1038/sdata.2017.171"
