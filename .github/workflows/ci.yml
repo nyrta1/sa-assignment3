@@ -62,7 +62,7 @@ jobs:
           --cov-fail-under=90 --junitxml=junit.xml
       - name: Upload coverage and test report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -103,7 +103,7 @@ jobs:
               print(f"| {m} | {t['roc_auc']} | {t['f1']} | {t['precision']} | {t['recall']} | {s} |")
           PY
           echo '```' >> "$GITHUB_STEP_SUMMARY"; cat audit.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: smoke-reports
           path: reports/
@@ -123,7 +123,7 @@ jobs:
         run: |
           pip install dist/*.whl
           oulad-risk --version
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
